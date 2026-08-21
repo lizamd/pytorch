@@ -66,6 +66,8 @@ def is_causal_mask_graph(graph_module, q_offset: int = 0) -> bool:
         ):
             return False
         add_lhs, add_rhs = value.args[:2]
+        if value.target in _ALPHA_ADD_TARGETS and value.kwargs.get("alpha", 1) != 1:
+            return False
         return (
             add_lhs is query
             and isinstance(add_rhs, (int, float))
@@ -117,6 +119,19 @@ def _fits_u32_buffer(node) -> bool:
         (size - 1) * stride for size, stride in zip(sizes, strides)
     )
     return storage_elements * element_size < _MAX_BUFFER_BYTES
+
+
+def _is_contiguous_shape_stride(
+    shape: tuple[int, ...], stride: tuple[int, ...]
+) -> bool:
+    if len(shape) != len(stride):
+        return False
+    expected_stride = 1
+    for size, actual_stride in reversed(tuple(zip(shape, stride))):
+        if size != 1 and actual_stride != expected_stride:
+            return False
+        expected_stride *= max(size, 1)
+    return True
 
 
 def _is_gfx950_device(device) -> bool:
