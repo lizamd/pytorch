@@ -10,6 +10,7 @@ from torch._inductor.kernel.flex import flex_flydsl_attention
 from torch._inductor.kernel.flex.flex_flydsl_attention import (
     _can_use_flydsl_flex_attention_backward,
     flex_flydsl_backward_template,
+    flex_flydsl_forward_template,
 )
 from torch.nn.attention.flex_attention import (
     BlockMask,
@@ -38,6 +39,11 @@ def _fake_query(dtype: torch.dtype) -> SimpleNamespace:
 
 class TestFlexFlyDSLGates(TestCase):
     def test_template_registered(self):
+        self.assertIn("flex_flydsl_forward", FlyDSLTemplate.all_templates)
+        self.assertIs(
+            FlyDSLTemplate.all_templates["flex_flydsl_forward"],
+            flex_flydsl_forward_template,
+        )
         self.assertIn("flex_flydsl_backward", FlyDSLTemplate.all_templates)
         self.assertIs(
             FlyDSLTemplate.all_templates["flex_flydsl_backward"],
