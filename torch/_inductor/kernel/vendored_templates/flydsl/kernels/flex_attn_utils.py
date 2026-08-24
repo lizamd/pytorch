@@ -13,7 +13,9 @@ _CAUSAL_DOCUMENT_MASK_PROGRAM = (
     ("and", 6, 9),
 )
 
-# FlyDSL 0.3 lacks stable grouped scheduling, fence-free barriers, and native exp2.
+# Intentional FlyDSL 0.3.1 unstable boundary: no stable API exposes nonzero
+# scheduler groups, a scheduler fence, native exp2, or readfirstlane. Keep
+# those calls centralized here so the kernels otherwise use the stable surface.
 _SCHED_MFMA, _SCHED_VMEM_READ, _SCHED_LDS_READ, _SCHED_EXP = (0x008, 0x020, 0x100, 0x400)
 
 
@@ -137,11 +139,15 @@ def schedule_fence():
 
 def scheduled_workgroup_barrier():
     schedule_fence()
-    fx.rocdl.s_barrier()
+    fx.gpu.barrier()
 
 
 def fast_exp2(value):
     return fx.Float32(fx.rocdl.exp2(fx.Float32.ir_type, value.ir_value()))
+
+
+def read_first_lane(value, dtype):
+    return dtype(fx.rocdl.readfirstlane(dtype.ir_type, value.ir_value()))
 
 
 def schedule_score_pipeline(*, mfma_count: int, dsrd_count: int, vmem_count: int):
@@ -158,6 +164,44 @@ def schedule_score_pipeline(*, mfma_count: int, dsrd_count: int, vmem_count: int
         fx.rocdl.sched_mfma(mfma_group)
         if const_expr(group < dsrd_groups):
             fx.rocdl.sched_dsrd(2)
+    schedule_fence()
+
+
+def schedule_fwd_qk_pipeline(*, reduction_steps: int):
+    """Interleave three LDS reads with each pair of QK MFMAs."""
+    dsrd_preload = min(6, 3 * reduction_steps)
+    fx.rocdl.sched_dsrd(dsrd_preload)
+    for step in fx.range_constexpr(reduction_steps):
+        fx.rocdl.sched_mfma(2)
+        if const_expr(step + 2 < reduction_steps):
+            fx.rocdl.sched_dsrd(3)
+    schedule_fence()
+
+
+def schedule_fwd_softmax_pipeline(*, vmem_count: int):
+    """Spread V loads across four groups of exponentiation work."""
+    slots = 4
+    vmem_per_slot = vmem_count // slots
+    vmem_remainder = vmem_count % slots
+    for slot in fx.range_constexpr(slots):
+        scheduled_vmem = vmem_per_slot + int(slot < vmem_remainder)
+        if const_expr(scheduled_vmem):
+            _schedule_group(_SCHED_VMEM_READ, scheduled_vmem, 1)
+        _schedule_group(_SCHED_EXP, 8, 1)
+    schedule_fence()
+
+
+def schedule_fwd_pv_pipeline(*, output_chunks: int):
+    """Keep two V LDS reads ahead of each output MFMA."""
+    mfma_count = 4 * output_chunks
+    dsrd_count = 2 * mfma_count
+    dsrd_preload = min(4, dsrd_count)
+    fx.rocdl.sched_dsrd(dsrd_preload)
+    remaining_reads = dsrd_count - dsrd_preload
+    for mfma_index in fx.range_constexpr(mfma_count):
+        if const_expr(2 * mfma_index < remaining_reads):
+            fx.rocdl.sched_dsrd(min(2, remaining_reads - 2 * mfma_index))
+        fx.rocdl.sched_mfma(1)
     schedule_fence()
 
 

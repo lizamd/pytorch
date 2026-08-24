@@ -3,9 +3,9 @@
 import importlib
 from typing import Any
 
-
 _EXPORT_MODULES = {
     "build_flex_attn_bwd_module": "flex_attn_bwd_gfx950",
+    "build_flex_attn_fwd_module": "flex_attn_fwd_gfx950",
 }
 __all__ = list(_EXPORT_MODULES)
 
