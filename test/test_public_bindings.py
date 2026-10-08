@@ -370,6 +370,7 @@ class TestPublicBindings(TestCase):
             "torch._inductor.kernel.vendored_templates.cutedsl.dense_blockscaled_gemm_persistent",  # depends on cutlass
             "torch._inductor.kernel.vendored_templates.cutedsl.wrappers",  # depends on cutlass.operators
             "torch._inductor.kernel.vendored_templates.cutedsl.wrappers.dense_blockscaled_gemm_kernel",  # depends on cutlass.operators
+            "torch._inductor.kernel.vendored_templates.flydsl.kernels.flex_attn_fwd_gfx950",  # depends on flydsl
             "torch._inductor.kernel.vendored_templates.flydsl.kernels.flex_attn_fwd_helpers",  # depends on flydsl
             "torch._inductor.kernel.vendored_templates.flydsl.kernels.flex_attn_fwd_pipeline",  # depends on flydsl
             "torch._inductor.kernel.vendored_templates.flydsl.kernels.flex_attn_fwd_launch",  # depends on flydsl
