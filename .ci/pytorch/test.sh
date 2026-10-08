@@ -1336,6 +1336,7 @@ PY
     inductor/test_flydsl_grouped_scheduler.py \
     inductor/test_flydsl_flex_mask.py \
     inductor/test_flydsl_flex_config.py \
+    inductor/test_flydsl_flex_attention.py \
     --verbose
   assert_git_not_dirty
 }
